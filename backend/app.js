@@ -1,3 +1,5 @@
+require('dotenv').config();     // Add this at the very top
+
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -6,15 +8,16 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
+const PORT = process.env.PORT || 8080;
+const SECRET = process.env.SECRET || "default_secret_if_none_set";
+
 app.use(cors({
   origin: 'https://your-netlify-site.netlify.app', // Update to your Netlify frontend URL
   credentials: true
 }));
 app.use(bodyParser.json());
 
-const SECRET = "your_super_secret_key";
-
-const USER = { id: 1, email: "workchopoff@gmail.com", password: "password123" };
+const USER = { id: 1, email: "workchopoff@gmail.com", password: "password123_zMq-h5*wE-FdUk" };
 
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
@@ -48,4 +51,4 @@ app.get('/api/file/:id', authenticate, (req, res) => {
   }
 });
 
-app.listen(8080, () => console.log("Backend running on port 8080"));
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
