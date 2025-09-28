@@ -1,8 +1,4 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-
-dotenv.config();
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
@@ -10,8 +6,9 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
-const app = express();
 const nodemailer = require("nodemailer");
+
+const app = express();
 
 const allowedOrigins = [
   'http://localhost:3000',               // your local dev frontend URL
