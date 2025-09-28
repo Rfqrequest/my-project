@@ -1,4 +1,8 @@
-require('dotenv').config();     // Add this at the very top
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const express = require('express');
 const cors = require('cors');
@@ -9,6 +13,11 @@ const path = require('path');
 const app = express();
 const nodemailer = require("nodemailer");
 
+const allowedOrigins = [
+  'http://localhost:3000',               // your local dev frontend URL
+  'https://po0948.netlify.app'   // your deployed Netlify frontend URL
+];
+
 const PORT = process.env.PORT || 8080;
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
@@ -16,8 +25,14 @@ const adminEmail = process.env.ADMIN_EMAIL;
 const SECRET = process.env.SECRET || "default_secret_if_none_set";
 
 app.use(cors({
-  origin: 'https://your-netlify-site.netlify.app', // Update to your Netlify frontend URL
-  credentials: true
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);  // allow requests with no origin (e.g. Postman, curl)
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('Not allowed by CORS'), false); // reject other origins
+    }
+    return callback(null, true);
+  },
+  credentials: true // allow cookies/auth headers
 }));
 
 app.use(bodyParser.json());
