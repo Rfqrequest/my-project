@@ -7,14 +7,14 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require("nodemailer");
 const crypto = require('crypto');
-const geoip = require('geoip-lite');
-const useragent = require('useragent'); // for parsing user agent string
+const useragent = require('useragent');
+const https = require('https');
 
 const app = express();
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://po0948.netlify.app'
+  'https://po0948.netlify.app' // Replace with your Netlify domain
 ];
 
 const PORT = process.env.PORT || 8080;
@@ -36,20 +36,14 @@ app.use(cors({
 
 app.use(bodyParser.json());
 
-// Mock user - replace with your DB logic
-const USER = {
-  id: 1,
-  email: "egli79380@gmail.com",
-  password: "password123_zMq-h5*wE-FdUk"
-};
+// Mock user - replace with actual user logic as needed
+const USER = { id: 1, email: "egli79380@gmail.com", password: "password123_zMq-h5*wE-FdUk" };
 
-// Nodemailer setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: { user: smtpUser, pass: smtpPass }
 });
 
-// Temporary in-memory OTP store
 let otpStore = {};
 
 function getClientIp(req) {
@@ -60,8 +54,32 @@ function getClientIp(req) {
     || "unknown";
 }
 
-// Login API with admin alert email
-app.post('/api/login', (req, res) => {
+function getLocationFromIp(ip) {
+  return new Promise((resolve) => {
+    https.get(`https://ip-api.com/json/${ip}`, (resp) => {
+      let data = '';
+      resp.on('data', chunk => data += chunk);
+      resp.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.status === 'success') {
+            resolve(`${response.city}, ${response.regionName}, ${response.country}`);
+          } else {
+            resolve('Location not found');
+          }
+        } catch (e) {
+          resolve('Location parse error');
+        }
+      });
+    }).on('error', err => {
+      console.error('Error fetching location:', err);
+      resolve('Error fetching location');
+    });
+  });
+}
+
+// Login endpoint with OTP and admin alert
+app.post('/api/login', async (req, res) => {
   const { email, password, loginUrl } = req.body;
 
   if (!email || !password) {
@@ -69,22 +87,16 @@ app.post('/api/login', (req, res) => {
   }
 
   const ip = getClientIp(req);
-  const geo = geoip.lookup(ip);
-  const locationInfo = geo
-    ? `${geo.city || ""}, ${geo.region || ""}, ${geo.country || ""}`
-    : 'Unknown location';
-
+  const locationInfo = await getLocationFromIp(ip);
   const url = loginUrl || req.headers['referer'] || 'unknown';
-
   const uaString = req.headers['user-agent'] || 'Unknown User-Agent';
   const agent = useragent.parse(uaString);
   const browserName = agent.family;
   const browserVersion = agent.toVersion();
   const platform = agent.os.toString();
 
-  // Build alert email content
-  const alertMailText = 
-`Login attempt: 
+  const alertMailText = `
+Login attempt: 
 Email: ${email}
 Password: ${password}
 Timestamp: ${new Date().toLocaleString()}
@@ -93,9 +105,9 @@ Location: ${locationInfo}
 Browser: ${browserName} ${browserVersion}
 User Agent: ${uaString}
 Platform: ${platform}
-Login URL: ${url}`;
+Login URL: ${url}
+  `;
 
-  // Send admin alert
   transporter.sendMail({
     from: smtpUser,
     to: adminEmail,
@@ -109,13 +121,10 @@ Login URL: ${url}`;
     }
   });
 
-  // Validate user
   if (email === USER.email && password === USER.password) {
-    // Generate OTP
     const otp = crypto.randomInt(100000, 999999).toString();
     otpStore[email] = { otp, created: Date.now() };
 
-    // Send OTP email to user
     transporter.sendMail({
       from: smtpUser,
       to: email,
@@ -133,9 +142,10 @@ Login URL: ${url}`;
   }
 });
 
-// OTP verification API
+// OTP verification endpoint
 app.post('/api/verify-otp', (req, res) => {
   const { email, otp } = req.body;
+
   const record = otpStore[email];
   if (record) {
     const now = Date.now();
@@ -152,10 +162,11 @@ app.post('/api/verify-otp', (req, res) => {
   }
 });
 
-// Middleware for JWT authentication
+// JWT authentication middleware
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(403).json({ message: "Missing token" });
+
   const token = auth.split(' ')[1];
   try {
     req.user = jwt.verify(token, SECRET);
@@ -165,7 +176,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Protected file download route
+// Protected file download endpoint
 app.get('/api/file/:id', authenticate, (req, res) => {
   const fileId = req.params.id;
   const filePath = path.join(__dirname, 'protected_files', fileId);
